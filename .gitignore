@@ -1,5 +1,7 @@
 # Environment & Secrets
 .env
+.env.*
+!.env.example
 .env.local
 *.env
 
@@ -20,10 +22,36 @@ __pycache__/
 .coverage
 htmlcov/
 .tox/
+.mypy_cache/
+.ruff_cache/
+
+# Logs & Temporary Files
+*.log
+*.tmp
+*.temp
+*.bak
+tmp/
+temp/
 
 # Private Storage & Uploaded Resumes
 storage/resumes/*
 !storage/resumes/.gitkeep
+
+# Generated datasets and model artifacts
+data/generated/
+datasets/generated/
+models/
+artifacts/
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+
+# Build outputs
+build/
+dist/
+*.egg-info/
 
 # Editor & IDE
 .vscode/
