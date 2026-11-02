@@ -161,15 +161,37 @@ def test_end_to_end_evaluate_resume(sample_extraction_result, sample_complete_re
     assert len(report.category_breakdown) == 7
     assert len(report.summary_strengths) > 0
 
-def test_recommendation_generation_fallback(sample_extraction_result, sample_complete_resume):
+def test_recommendation_generation_fallback(sample_extraction_result):
+    """
+    Test that the deterministic fallback path works and returns a valid list.
+    Uses a sparse resume (no summary, no work experience metrics) to ensure
+    at least one fallback recommendation is generated without making a real API call.
+    """
+    from unittest.mock import MagicMock
+    from app.integrations.gemini.client import GeminiResumeExtractionClient
+
+    # Sparse resume — missing professional summary, no quantified achievements
+    sparse_resume = StructuredResume(
+        contact_info=ContactInformation(
+            full_name="Test Candidate",
+            email="test@example.com",
+        ),
+        professional_summary="",  # triggers summary recommendation
+        skills=SkillsInventory(languages=["Python"]),
+    )
+
     engine = ATSScoringEngine()
-    report = engine.evaluate_resume(sample_extraction_result, sample_complete_resume)
-    
-    recommender = ResumeRecommendationService()
-    recs = recommender.generate_recommendations(sample_complete_resume, report)
+    report = engine.evaluate_resume(sample_extraction_result, sparse_resume)
+
+    # Force fallback path — no real Gemini API call
+    mock_client = MagicMock(spec=GeminiResumeExtractionClient)
+    mock_client.is_available.return_value = False
+
+    recommender = ResumeRecommendationService(client=mock_client)
+    recs = recommender.generate_recommendations(sparse_resume, report)
 
     assert isinstance(recs, list)
-    assert len(recs) >= 1
+    assert len(recs) >= 1, "Fallback must produce at least one recommendation for a sparse resume"
     for r in recs:
         assert r.category is not None
         assert r.suggested_improvement is not None
