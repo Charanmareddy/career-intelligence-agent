@@ -31,6 +31,105 @@ with st.sidebar:
     if not resume_id:
         st.warning("Enter a Resume ID to enable matching.")
 
+
+# ─── Shared render function ───────────────────────────────────────────────────
+def _render_match_report(report: dict):
+    """Renders a JobMatchReport dict as a structured Streamlit UI."""
+    score = report.get("overall_match_score", 0)
+    tier = report.get("match_tier", "Unknown")
+    job_title = report.get("job_title", "")
+
+    # Score metric row
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Overall Match", f"{score:.1f}%")
+    col2.metric("Match Tier", tier)
+    col3.metric(
+        "Mandatory Skills",
+        f"{report.get('mandatory_skills_match_rate', 0):.1f}%",
+    )
+    col4.metric(
+        "Preferred Skills",
+        f"{report.get('preferred_skills_match_rate', 0):.1f}%",
+    )
+
+    # Score bar
+    st.progress(min(int(score), 100))
+
+    st.divider()
+
+    # Skills breakdown
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        matched = report.get("matched_skills", [])
+        partial = report.get("partially_matched_skills", [])
+        st.markdown(f"#### ✅ Matched Skills ({len(matched)})")
+        if matched:
+            for skill in matched:
+                evidence = skill.get("supporting_evidence", "")
+                badge = "🔑" if skill.get("is_mandatory") else "⭐"
+                st.markdown(
+                    f"{badge} **{skill['requirement']}** — *{skill.get('matched_term', skill['requirement'])}*"
+                )
+                if evidence:
+                    st.caption(f"   Evidence: {evidence[:120]}…" if len(evidence) > 120 else f"   Evidence: {evidence}")
+        else:
+            st.caption("No skills directly matched.")
+
+        if partial:
+            st.markdown(f"#### 🟡 Partial Matches ({len(partial)})")
+            for skill in partial:
+                st.markdown(f"- **{skill['requirement']}** ≈ {skill.get('matched_term', '?')} ({skill.get('similarity_score', 0):.0f}%)")
+
+    with col_right:
+        missing = report.get("missing_skills", [])
+        st.markdown(f"#### ❌ Missing Skills ({len(missing)})")
+        if missing:
+            mandatory_missing = [s for s in missing if s.get("is_mandatory")]
+            optional_missing = [s for s in missing if not s.get("is_mandatory")]
+            if mandatory_missing:
+                st.markdown("**Critical gaps (mandatory):**")
+                for skill in mandatory_missing:
+                    st.markdown(f"- 🔴 {skill['requirement']}")
+            if optional_missing:
+                st.markdown("**Preferred gaps:**")
+                for skill in optional_missing[:5]:
+                    st.markdown(f"- 🟠 {skill['requirement']}")
+        else:
+            st.success("No missing skills — strong match!")
+
+    st.divider()
+
+    # Experience & Education alignment
+    exp_align = report.get("experience_alignment", {})
+    edu_align = report.get("education_alignment", {})
+    if exp_align or edu_align:
+        st.markdown("#### 📊 Alignment Details")
+        col_a, col_b = st.columns(2)
+        if exp_align:
+            with col_a:
+                st.markdown("**Experience**")
+                for k, v in exp_align.items():
+                    st.caption(f"{k}: {v}")
+        if edu_align:
+            with col_b:
+                st.markdown("**Education**")
+                for k, v in edu_align.items():
+                    st.caption(f"{k}: {v}")
+
+    # Tailoring recommendations
+    recs = report.get("tailoring_recommendations", [])
+    if recs:
+        with st.expander("💡 Tailoring Recommendations", expanded=True):
+            for r in recs:
+                st.markdown(f"- {r}")
+
+    # Disclaimer
+    disclaimer = report.get("disclaimer", "")
+    if disclaimer:
+        st.caption(f"ℹ️ {disclaimer}")
+
+
 # ─── Main tabs ────────────────────────────────────────────────────────────────
 tab_jd, tab_designation = st.tabs([
     "📝 Job Description Match",
@@ -132,101 +231,3 @@ with tab_designation:
                                 st.markdown(f"- {a}")
 
                     st.caption(result.get("disclaimer", ""))
-
-
-# ─── Shared render function ───────────────────────────────────────────────────
-def _render_match_report(report: dict):
-    """Renders a JobMatchReport dict as a structured Streamlit UI."""
-    score = report.get("overall_match_score", 0)
-    tier = report.get("match_tier", "Unknown")
-    job_title = report.get("job_title", "")
-
-    # Score metric row
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Overall Match", f"{score:.1f}%")
-    col2.metric("Match Tier", tier)
-    col3.metric(
-        "Mandatory Skills",
-        f"{report.get('mandatory_skills_match_rate', 0):.1f}%",
-    )
-    col4.metric(
-        "Preferred Skills",
-        f"{report.get('preferred_skills_match_rate', 0):.1f}%",
-    )
-
-    # Score bar
-    st.progress(min(int(score), 100))
-
-    st.divider()
-
-    # Skills breakdown
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        matched = report.get("matched_skills", [])
-        partial = report.get("partially_matched_skills", [])
-        st.markdown(f"#### ✅ Matched Skills ({len(matched)})")
-        if matched:
-            for skill in matched:
-                evidence = skill.get("supporting_evidence", "")
-                badge = "🔑" if skill.get("is_mandatory") else "⭐"
-                st.markdown(
-                    f"{badge} **{skill['requirement']}** — *{skill.get('matched_term', skill['requirement'])}*"
-                )
-                if evidence:
-                    st.caption(f"   Evidence: {evidence[:120]}…" if len(evidence) > 120 else f"   Evidence: {evidence}")
-        else:
-            st.caption("No skills directly matched.")
-
-        if partial:
-            st.markdown(f"#### 🟡 Partial Matches ({len(partial)})")
-            for skill in partial:
-                st.markdown(f"- **{skill['requirement']}** ≈ {skill.get('matched_term', '?')} ({skill.get('similarity_score', 0):.0f}%)")
-
-    with col_right:
-        missing = report.get("missing_skills", [])
-        st.markdown(f"#### ❌ Missing Skills ({len(missing)})")
-        if missing:
-            mandatory_missing = [s for s in missing if s.get("is_mandatory")]
-            optional_missing = [s for s in missing if not s.get("is_mandatory")]
-            if mandatory_missing:
-                st.markdown("**Critical gaps (mandatory):**")
-                for skill in mandatory_missing:
-                    st.markdown(f"- 🔴 {skill['requirement']}")
-            if optional_missing:
-                st.markdown("**Preferred gaps:**")
-                for skill in optional_missing[:5]:
-                    st.markdown(f"- 🟠 {skill['requirement']}")
-        else:
-            st.success("No missing skills — strong match!")
-
-    st.divider()
-
-    # Experience & Education alignment
-    exp_align = report.get("experience_alignment", {})
-    edu_align = report.get("education_alignment", {})
-    if exp_align or edu_align:
-        st.markdown("#### 📊 Alignment Details")
-        col_a, col_b = st.columns(2)
-        if exp_align:
-            with col_a:
-                st.markdown("**Experience**")
-                for k, v in exp_align.items():
-                    st.caption(f"{k}: {v}")
-        if edu_align:
-            with col_b:
-                st.markdown("**Education**")
-                for k, v in edu_align.items():
-                    st.caption(f"{k}: {v}")
-
-    # Tailoring recommendations
-    recs = report.get("tailoring_recommendations", [])
-    if recs:
-        with st.expander("💡 Tailoring Recommendations", expanded=True):
-            for r in recs:
-                st.markdown(f"- {r}")
-
-    # Disclaimer
-    disclaimer = report.get("disclaimer", "")
-    if disclaimer:
-        st.caption(f"ℹ️ {disclaimer}")
