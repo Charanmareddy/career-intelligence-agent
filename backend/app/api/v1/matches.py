@@ -52,9 +52,14 @@ def analyze_job_match(request: MatchRequest):
             content = f.read()
         extraction = DocumentParserService.parse_document(content, file_path.name)
         
+        structured_resume = None
         if extraction_service.client.is_available():
-            structured_resume = extraction_service.extract_from_text(extraction.cleaned_text)
-        else:
+            try:
+                structured_resume = extraction_service.extract_from_text(extraction.cleaned_text)
+            except Exception:
+                structured_resume = None
+
+        if not structured_resume:
             structured_resume = extraction_service.create_synthetic_profile(
                 name="Candidate",
                 title="AI & Software Engineer",
@@ -131,9 +136,14 @@ def match_against_designation(request: DesignationMatchRequest):
             content = f.read()
         extraction = DocumentParserService.parse_document(content, file_path.name)
 
+        structured_resume = None
         if extraction_service.client.is_available():
-            structured_resume = extraction_service.extract_from_text(extraction.cleaned_text)
-        else:
+            try:
+                structured_resume = extraction_service.extract_from_text(extraction.cleaned_text)
+            except Exception:
+                structured_resume = None
+
+        if not structured_resume:
             structured_resume = extraction_service.create_synthetic_profile(
                 name="Candidate",
                 title="AI & Software Engineer",

@@ -24,7 +24,15 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     DEFAULT_GEMINI_MODEL: str = "gemini-2.5-flash"
     
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    # Optional Database & Redis settings (Phase 2 readiness)
+    DATABASE_URL: str = ""
+    REDIS_URL: str = ""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
 settings = Settings()
 settings.RESUME_STORAGE_DIR.mkdir(parents=True, exist_ok=True)

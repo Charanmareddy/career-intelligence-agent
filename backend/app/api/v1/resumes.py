@@ -115,15 +115,20 @@ def extract_structure_from_stored_resume(resume_id: str):
             content = f.read()
         extraction = DocumentParserService.parse_document(content, file_path.name)
         
-        # If Gemini is available, use it; otherwise use synthetic profile fallback
+        structured = None
         if extraction_service.client.is_available():
-            return extraction_service.extract_from_text(extraction.cleaned_text)
-        else:
-            return extraction_service.create_synthetic_profile(
+            try:
+                structured = extraction_service.extract_from_text(extraction.cleaned_text)
+            except Exception:
+                structured = None
+
+        if not structured:
+            structured = extraction_service.create_synthetic_profile(
                 name="Candidate",
                 title="AI & Software Engineer",
                 skills=["Python", "FastAPI", "SQL", "Docker", "PyTorch"]
             )
+        return structured
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except RuntimeError as e:
@@ -150,9 +155,14 @@ def analyze_resume_ats_readiness(resume_id: str):
             content = f.read()
         extraction = DocumentParserService.parse_document(content, file_path.name)
         
+        structured = None
         if extraction_service.client.is_available():
-            structured = extraction_service.extract_from_text(extraction.cleaned_text)
-        else:
+            try:
+                structured = extraction_service.extract_from_text(extraction.cleaned_text)
+            except Exception:
+                structured = None
+
+        if not structured:
             structured = extraction_service.create_synthetic_profile(
                 name="Candidate",
                 title="AI & Software Engineer",

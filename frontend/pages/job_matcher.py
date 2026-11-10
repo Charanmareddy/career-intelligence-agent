@@ -7,7 +7,11 @@ Two-tab interface:
 """
 
 import streamlit as st
-from frontend.api_client.client import APIClient
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from api_client.client import APIClient
 
 st.set_page_config(page_title="Job Matcher | AI Career Intelligence", page_icon="🎯")
 
