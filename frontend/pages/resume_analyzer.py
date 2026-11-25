@@ -35,9 +35,14 @@ if uploaded_file is not None:
         if "current_resume" in st.session_state:
             res = st.session_state["current_resume"]
             resume_id = res.get("resume_id")
+            st.session_state["resume_id"] = resume_id
             extraction = res.get("extraction", {})
             metadata = extraction.get("metadata", {})
             warnings = extraction.get("warnings", [])
+
+            # Display Resume ID prominently
+            if resume_id:
+                st.info(f"🔑 **Active Resume ID:** `{resume_id}` *(Auto-saved for Job Matcher)*")
 
             # Metrics Row
             m1, m2, m3, m4 = st.columns(4)

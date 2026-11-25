@@ -27,13 +27,17 @@ st.divider()
 # ─── Sidebar: Resume ID input ─────────────────────────────────────────────────
 with st.sidebar:
     st.header("📄 Resume Selection")
+    default_id = st.session_state.get("resume_id", "")
     resume_id = st.text_input(
         "Resume ID",
+        value=default_id,
         placeholder="e.g. abc123",
         help="Upload your resume on the Resume Analyzer page first, then paste the Resume ID here.",
     )
     if not resume_id:
         st.warning("Enter a Resume ID to enable matching.")
+    else:
+        st.caption(f"Active Resume: `{resume_id}`")
 
 
 # ─── Shared render function ───────────────────────────────────────────────────
