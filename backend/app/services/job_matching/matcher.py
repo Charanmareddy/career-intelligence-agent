@@ -12,20 +12,47 @@ from app.schemas.job_matching import (
 
 # Canonical ontology alias dictionary
 TECH_ONTOLOGY: Dict[str, List[str]] = {
+    # Programming & Frameworks
     "python": ["python3", "py", "python programming"],
-    "fastapi": ["fast api", "rest api", "starlette", "asgi"],
+    "fastapi": ["fast api", "rest api", "starlette", "asgi", "api", "apis"],
     "postgresql": ["postgres", "psql", "postgresql db", "rdbms"],
     "docker": ["containerization", "containers", "dockerfile", "docker-compose"],
     "kubernetes": ["k8s", "container orchestration", "helm"],
     "pytorch": ["torch", "deep learning", "neural networks"],
     "tensorflow": ["tf", "keras", "deep learning"],
-    "langchain": ["langchain core", "llm framework"],
-    "langgraph": ["agentic workflows", "multi-agent", "graph orchestration"],
+    "langchain": ["langchain core", "llm framework", "llm integration"],
+    "langgraph": ["agentic workflows", "multi-agent", "graph orchestration", "ai agents"],
     "aws": ["amazon web services", "ec2", "s3", "lambda"],
     "gcp": ["google cloud", "google cloud platform", "vertex ai"],
     "redis": ["in-memory cache", "redis cache", "redis queue"],
     "git": ["version control", "github", "gitlab"],
-    "sql": ["structured query language", "relational database", "mysql", "sqlite"]
+    "sql": ["structured query language", "relational database", "mysql", "sqlite"],
+
+    # AI, GenAI & LLM Domains
+    "ai engineering": ["ai engineer", "applied ai", "ai tool", "ai tools", "machine learning", "ml", "genai", "artificial intelligence"],
+    "artificial intelligence": ["ai", "machine learning", "ml", "deep learning", "ai engineering"],
+    "ai": ["artificial intelligence", "ai engineering", "machine learning", "ml"],
+    "genai": ["generative ai", "gen ai", "llm", "llms", "large language models", "foundation models", "rag", "prompt engineering"],
+    "generative ai": ["genai", "gen ai", "llm", "llms", "large language models", "foundation models", "diffusion models", "rag"],
+    "llm": ["llms", "large language model", "large language models", "genai", "generative ai", "gemini", "gpt", "claude", "llama", "prompt engineering", "context engineering"],
+    "llms": ["llm", "large language model", "large language models", "genai", "generative ai", "gemini", "gpt", "claude", "llama"],
+    "prompt engineering": ["context engineering", "in-context learning", "few-shot", "system prompts", "prompt design"],
+    "context engineering": ["prompt engineering", "in-context learning", "system instructions", "context management", "prompt design"],
+    "rag": ["retrieval augmented generation", "retrieval-augmented generation", "vector search", "vector database", "embeddings", "pinecone", "chromadb"],
+
+    # Data, Document Processing & Unstructured Data
+    "unstructured data": ["pdf", "pdfs", "document processing", "documents", "document parser", "text extraction", "text processing", "nlp", "ocr", "embeddings", "vector search"],
+    "document processing": ["pdf", "pdfs", "document parser", "document parsing", "ocr", "text extraction", "pymupdf", "pypdf", "docx", "unstructured data"],
+    "pdf": ["pdfs", "document processing", "document parser", "pymupdf", "pypdf", "unstructured data"],
+    "pdfs": ["pdf", "document processing", "document parser", "pymupdf", "pypdf", "unstructured data"],
+
+    # General Competencies & Projects
+    "problem-solving skills": ["problem solving", "problem-solving", "analytical skills", "troubleshooting", "critical thinking", "engineering", "ai system development"],
+    "problem solving skills": ["problem solving", "problem-solving", "analytical skills", "troubleshooting", "critical thinking", "engineering", "ai system development"],
+    "problem-solving": ["problem solving", "problem-solving skills", "analytical skills", "troubleshooting", "engineering"],
+    "problem solving": ["problem solving skills", "problem-solving", "analytical skills", "troubleshooting", "engineering"],
+    "ai-based projects": ["ai projects", "ai project", "machine learning projects", "genai projects", "deep learning projects", "projects", "ai"],
+    "rest api": ["rest apis", "restful api", "fastapi", "flask", "django rest framework", "api endpoints", "api"],
 }
 
 class HybridJobMatcher:
@@ -75,11 +102,15 @@ class HybridJobMatcher:
 
         # Projects
         for p in resume.projects:
+            evidence_corpus.append((p.project_title.lower(), f"Project Title: {p.project_title}", "projects"))
             evidence_corpus.append((p.description.lower(), f"Project '{p.project_title}': {p.description}", "projects"))
             for out in p.key_outcomes:
                 evidence_corpus.append((out.lower(), f"Project '{p.project_title}': {out}", "projects"))
             for t in p.technologies_used:
                 evidence_corpus.append((t.lower(), f"Project '{p.project_title}' tech: {t}", "projects"))
+
+        if resume.projects:
+            evidence_corpus.append(("ai projects ai-based projects technical projects", f"Candidate has {len(resume.projects)} completed technical projects", "projects"))
 
         # Education & Certifications
         for edu in resume.education:
@@ -89,6 +120,20 @@ class HybridJobMatcher:
 
         return evidence_corpus
 
+    @classmethod
+    def _get_expanded_aliases(cls, token: str) -> List[str]:
+        """Bidirectional ontology alias expansion with direct aliases first."""
+        norm = cls._normalize_token(token)
+        aliases: List[str] = list(TECH_ONTOLOGY.get(norm, []))
+        for canonical, alias_list in TECH_ONTOLOGY.items():
+            if norm == canonical or norm in alias_list:
+                if canonical not in aliases and canonical != norm:
+                    aliases.append(canonical)
+                for a in alias_list:
+                    if a not in aliases and a != norm:
+                        aliases.append(a)
+        return aliases
+
     def match_skill(
         self,
         skill_req: str,
@@ -96,7 +141,14 @@ class HybridJobMatcher:
         is_mandatory: bool = True
     ) -> SkillMatchItem:
         req_norm = self._normalize_token(skill_req)
-        aliases = TECH_ONTOLOGY.get(req_norm, [])
+        aliases = self._get_expanded_aliases(skill_req)
+
+        # Plural and singular variants (e.g. pdfs <-> pdf, llms <-> llm)
+        variants = {req_norm}
+        if req_norm.endswith("s") and len(req_norm) > 3:
+            variants.add(req_norm[:-1])
+        else:
+            variants.add(req_norm + "s")
 
         best_score = 0.0
         best_match_term = None
@@ -104,19 +156,21 @@ class HybridJobMatcher:
         best_section = None
 
         for text_lower, raw_evidence, section in evidence_corpus:
-            # 1. Exact match
-            if req_norm in text_lower:
-                return SkillMatchItem(
-                    requirement=skill_req,
-                    match_status="MATCHED",
-                    matched_term=skill_req,
-                    similarity_score=100.0,
-                    is_mandatory=is_mandatory,
-                    supporting_evidence=raw_evidence,
-                    source_section=section
-                )
+            # 1. Exact match (including singular/plural)
+            for var in variants:
+                if var in text_lower:
+                    matched_label = raw_evidence.split(":", 1)[-1].strip() if ":" in raw_evidence else skill_req
+                    return SkillMatchItem(
+                        requirement=skill_req,
+                        match_status="MATCHED",
+                        matched_term=matched_label[:40],
+                        similarity_score=100.0,
+                        is_mandatory=is_mandatory,
+                        supporting_evidence=raw_evidence,
+                        source_section=section
+                    )
 
-            # 2. Ontology alias check
+            # 2. Ontology alias check (bidirectional)
             for alias in aliases:
                 if alias in text_lower:
                     return SkillMatchItem(
@@ -129,18 +183,23 @@ class HybridJobMatcher:
                         source_section=section
                     )
 
-            # 3. Fuzzy partial ratio
-            fuzzy_ratio = fuzz.partial_ratio(req_norm, text_lower)
+            # 3. Composite RapidFuzz matching (token_set_ratio + partial_ratio)
+            score_partial = fuzz.partial_ratio(req_norm, text_lower)
+            score_token_set = fuzz.token_set_ratio(req_norm, text_lower)
+            score_token_sort = fuzz.token_sort_ratio(req_norm, text_lower)
+            fuzzy_ratio = max(score_partial, score_token_set, score_token_sort)
+
             if fuzzy_ratio > best_score:
                 best_score = fuzzy_ratio
-                best_match_term = skill_req
+                matched_label = raw_evidence.split(":", 1)[-1].strip() if ":" in raw_evidence else skill_req
+                best_match_term = matched_label[:40]
                 best_evidence = raw_evidence
                 best_section = section
 
         # Threshold categorization
-        if best_score >= 85.0:
+        if best_score >= 80.0:
             status = "MATCHED"
-        elif best_score >= 65.0:
+        elif best_score >= 60.0:
             status = "PARTIALLY_MATCHED"
         else:
             status = "MISSING"
